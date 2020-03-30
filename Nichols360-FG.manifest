@@ -1,13 +1,13 @@
 {
 	"autodeskProduct":	"Fusion360",
 	"type":	"addin",
-	"id":	"796b445a-e433-4002-8498-ca20302d78dd",
+	"id":	"F0CB4753-7CB9-4600-8A35-F2C0CA7501DB",
 	"author":	"Matthew Nichols",
 	"description":	{
 		"":	"a compilation of addins created for Fusion 360"
 	},
 	"version":	"1.0.0",
 	"runOnStartup":	false,
-	"supportedOS":	"windows|mac",
+	"supportedOS":	"windows",
 	"editEnabled":	true
 }

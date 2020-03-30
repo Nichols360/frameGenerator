@@ -13,7 +13,7 @@ fWidth = 0
 wallThick = 0
 table_input = adsk.core.TableCommandInput.cast(None)
 path = os.getenv('APPDATA')
-loc = path + "\\Autodesk\\Autodesk Fusion 360\\API\\AddIns\\FusionFG\\" + "Struct Table.xlsx"
+loc = path + "\\Autodesk\\ApplicationPlugins\\Nichols360-FG.bundle\\Contents\\" + "Struct Table.xlsx"
 wb = xlrd.open_workbook(loc)
 sqsheet = wb.sheet_by_name('Ansi Square')
 rectSheet = wb.sheet_by_name('Ansi Rectangular')
@@ -318,7 +318,7 @@ class FrameGenerator(Fusion360CommandBase):
 
         _rowNumber = 0
         count = 0
-
+        
     # Run when the user selects your command icon from the Fusion 360 UI
     # Typically used to create and display a command dialog box
     # The following is a basic sample of a dialog UI
@@ -352,10 +352,7 @@ class FrameGenerator(Fusion360CommandBase):
         for i in range(sqsheet.nrows):
             sizeString = str(sqsheet.cell_value(i, 0)) + "x" + str(sqsheet.cell_value(i, 1)) + "x" + \
                          str(sqsheet.cell_value(i, 2))
-            if sizeString == '2.0x2.0x0.25':
-                size_select.listItems.add(sizeString, True)
-            else:
-                size_select.listItems.add(sizeString, False)
+            size_select.listItems.add(sizeString, False)
 
         # material_select = inputs.addDropDownCommandInput('Material', 'Select Material',
         #                                                  adsk.core.DropDownStyles.TextListDropDownStyle)

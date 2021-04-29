@@ -1,19 +1,23 @@
 import adsk.core
 import adsk.fusion
-from .lib import xlrd
 import os
-
+import sys
+from pathlib import Path
+from .lib import xlrd
 from .Fusion360Utilities.Fusion360CommandBase import Fusion360CommandBase
 from .Fusion360Utilities.Fusion360Utilities import get_app_objects
+from .Fusion360Utilities.Fusion360Utilities import AppObjects
 
+# global inputs
 _rowNumber = 0
 count = 0
 fHeight = 0
 fWidth = 0
 wallThick = 0
 table_input = adsk.core.TableCommandInput.cast(None)
-path = os.getenv('APPDATA')
-loc = path + "\\Autodesk\\ApplicationPlugins\\Nichols360-FG.bundle\\Contents\\" + "Struct Table.xlsx"
+path = Path(__file__).parent
+supportPath = "Struct Table.xlsx"
+loc = os.path.join(path, supportPath)
 wb = xlrd.open_workbook(loc)
 sqsheet = wb.sheet_by_name('Ansi Square')
 rectSheet = wb.sheet_by_name('Ansi Rectangular')
@@ -22,15 +26,14 @@ pipeSheet = wb.sheet_by_name('Ansi Pipe')
 
 def tube_frame(tab1, inputs, input_values):
     global fHeight, fWidth, wallThick, sqsheet, rectSheet, pipeSheet
-    ao = get_app_objects()
+    ao = AppObjects()
+
     # mem_select is now fam_select with the new changes.
     row_select = table_input.selectedRow
     fam_select = inputs.itemById('Family')
-
     size_select = inputs.itemById('Size')
     std_select = inputs.itemById('Standard')
     origin_select = inputs.itemById('OriginLoc' + str(row_select))
-
     if fam_select.selectedItem.name == 'Square':
         sizeSelect = size_select.selectedItem.name
         fHeight, fWidth, wallThick = sizeSelect.split("x")
@@ -71,135 +74,140 @@ def tube_frame(tab1, inputs, input_values):
     sketches = root_comp.sketches
     sketch = sketches.add(plane1)
     lines = sketch.sketchCurves.sketchLines
+    circle = sketch.sketchCurves.sketchCircles
 
-    if origin_select.selectedItem.name == 'Lower Left':
-        line = lines.addByTwoPoints(adsk.core.Point3D.create(0, 0, 0), adsk.core.Point3D.create(0, fWidth, 0))
-        line1 = lines.addByTwoPoints(line.endSketchPoint, adsk.core.Point3D.create(fHeight, fWidth, 0))
-        line2 = lines.addByTwoPoints(line1.endSketchPoint, adsk.core.Point3D.create(fHeight, 0, 0))
-        line3 = lines.addByTwoPoints(line2.endSketchPoint, line.startSketchPoint)
-        arc = sketch.sketchCurves.sketchArcs.addFillet(line, line.endSketchPoint.geometry, line1,
-                                                       line1.startSketchPoint.geometry, (wallThick * 2))
-        arc1 = sketch.sketchCurves.sketchArcs.addFillet(line1, line1.endSketchPoint.geometry, line2,
-                                                        line2.startSketchPoint.geometry, (wallThick * 2))
-        arc2 = sketch.sketchCurves.sketchArcs.addFillet(line2, line2.endSketchPoint.geometry, line3,
-                                                        line3.startSketchPoint.geometry, (wallThick * 2))
-        arc3 = sketch.sketchCurves.sketchArcs.addFillet(line3, line3.endSketchPoint.geometry, line,
-                                                        line.startSketchPoint.geometry, (wallThick * 2))
+    if fam_select.selectedItem.name == 'Square' or fam_select.selectedItem.name == 'Rectangular':
+        if origin_select.selectedItem.name == 'Lower Left':
+            line = lines.addByTwoPoints(adsk.core.Point3D.create(0, 0, 0), adsk.core.Point3D.create(0, fWidth, 0))
+            line1 = lines.addByTwoPoints(line.endSketchPoint, adsk.core.Point3D.create(fHeight, fWidth, 0))
+            line2 = lines.addByTwoPoints(line1.endSketchPoint, adsk.core.Point3D.create(fHeight, 0, 0))
+            line3 = lines.addByTwoPoints(line2.endSketchPoint, line.startSketchPoint)
+            arc = sketch.sketchCurves.sketchArcs.addFillet(line, line.endSketchPoint.geometry, line1,
+                                                           line1.startSketchPoint.geometry, (wallThick * 2))
+            arc1 = sketch.sketchCurves.sketchArcs.addFillet(line1, line1.endSketchPoint.geometry, line2,
+                                                            line2.startSketchPoint.geometry, (wallThick * 2))
+            arc2 = sketch.sketchCurves.sketchArcs.addFillet(line2, line2.endSketchPoint.geometry, line3,
+                                                            line3.startSketchPoint.geometry, (wallThick * 2))
+            arc3 = sketch.sketchCurves.sketchArcs.addFillet(line3, line3.endSketchPoint.geometry, line,
+                                                            line.startSketchPoint.geometry, (wallThick * 2))
 
-        curves = sketch.findConnectedCurves(line)
+            curves = sketch.findConnectedCurves(line)
 
-        dirpoint = adsk.core.Point3D.create(0, 0, 0)
-        offsetCurves = sketch.offset(curves, dirpoint, (-(wallThick)))
+            dirpoint = adsk.core.Point3D.create(0, 0, 0)
+            offsetCurves = sketch.offset(curves, dirpoint, (-(wallThick)))
 
-        WebOffset = fHeight - wallThick
-        WebOffset2 = fWidth - wallThick
-        profile = sketch.profiles.item(1)
-        extent_distance = adsk.core.ValueInput.createByReal(ExtrusionLengthSelect)
-        extrudes = root_comp.features.extrudeFeatures
-        extrude1 = extrudes.addSimple(profile, extent_distance,
-                                      adsk.fusion.FeatureOperations.NewComponentFeatureOperation)
-    elif origin_select.selectedItem.name == 'Lower Right':
-        line = lines.addByTwoPoints(adsk.core.Point3D.create(0, 0, 0), adsk.core.Point3D.create(0, (-(fWidth)), 0))
-        line1 = lines.addByTwoPoints(line.endSketchPoint, adsk.core.Point3D.create(fHeight, (-(fWidth)), 0))
-        line2 = lines.addByTwoPoints(line1.endSketchPoint, adsk.core.Point3D.create(fHeight, 0, 0))
-        line3 = lines.addByTwoPoints(line2.endSketchPoint, line.startSketchPoint)
+            WebOffset = fHeight - wallThick
+            WebOffset2 = fWidth - wallThick
+            profile = sketch.profiles.item(1)
+            extent_distance = adsk.core.ValueInput.createByReal(ExtrusionLengthSelect)
+            extrudes = root_comp.features.extrudeFeatures
+            extrude1 = extrudes.addSimple(profile, extent_distance,
+                                          adsk.fusion.FeatureOperations.NewComponentFeatureOperation)
+        elif origin_select.selectedItem.name == 'Lower Right':
+            line = lines.addByTwoPoints(adsk.core.Point3D.create(0, 0, 0), adsk.core.Point3D.create(0, (-(fWidth)), 0))
+            line1 = lines.addByTwoPoints(line.endSketchPoint, adsk.core.Point3D.create(fHeight, (-(fWidth)), 0))
+            line2 = lines.addByTwoPoints(line1.endSketchPoint, adsk.core.Point3D.create(fHeight, 0, 0))
+            line3 = lines.addByTwoPoints(line2.endSketchPoint, line.startSketchPoint)
 
-        arc = sketch.sketchCurves.sketchArcs.addFillet(line, line.endSketchPoint.geometry, line1,
-                                                       line1.startSketchPoint.geometry, (wallThick * 2))
-        arc1 = sketch.sketchCurves.sketchArcs.addFillet(line1, line1.endSketchPoint.geometry, line2,
-                                                        line2.startSketchPoint.geometry, (wallThick * 2))
-        arc2 = sketch.sketchCurves.sketchArcs.addFillet(line2, line2.endSketchPoint.geometry, line3,
-                                                        line3.startSketchPoint.geometry, (wallThick * 2))
-        arc3 = sketch.sketchCurves.sketchArcs.addFillet(line3, line3.endSketchPoint.geometry, line,
-                                                        line.startSketchPoint.geometry, (wallThick * 2))
+            arc = sketch.sketchCurves.sketchArcs.addFillet(line, line.endSketchPoint.geometry, line1,
+                                                           line1.startSketchPoint.geometry, (wallThick * 2))
+            arc1 = sketch.sketchCurves.sketchArcs.addFillet(line1, line1.endSketchPoint.geometry, line2,
+                                                            line2.startSketchPoint.geometry, (wallThick * 2))
+            arc2 = sketch.sketchCurves.sketchArcs.addFillet(line2, line2.endSketchPoint.geometry, line3,
+                                                            line3.startSketchPoint.geometry, (wallThick * 2))
+            arc3 = sketch.sketchCurves.sketchArcs.addFillet(line3, line3.endSketchPoint.geometry, line,
+                                                            line.startSketchPoint.geometry, (wallThick * 2))
 
-        curves = sketch.findConnectedCurves(line)
+            curves = sketch.findConnectedCurves(line)
 
-        dirpoint = adsk.core.Point3D.create(0, 0, 0)
-        offsetCurves = sketch.offset(curves, dirpoint, (-(wallThick)))
+            dirpoint = adsk.core.Point3D.create(0, 0, 0)
+            offsetCurves = sketch.offset(curves, dirpoint, (-(wallThick)))
 
-        profile = sketch.profiles.item(0)
-        extent_distance = adsk.core.ValueInput.createByReal(ExtrusionLengthSelect)
-        extrudes = root_comp.features.extrudeFeatures
-        extrude1 = extrudes.addSimple(profile, extent_distance,
-                                      adsk.fusion.FeatureOperations.NewComponentFeatureOperation)
-    elif origin_select.selectedItem.name == 'Upper Right':
-        line = lines.addByTwoPoints(adsk.core.Point3D.create(0, 0, 0), adsk.core.Point3D.create(0, (-(fWidth)), 0))
-        line1 = lines.addByTwoPoints(line.endSketchPoint, adsk.core.Point3D.create((-(fHeight)), (-(fWidth)), 0))
-        line2 = lines.addByTwoPoints(line1.endSketchPoint, adsk.core.Point3D.create((-(fHeight)), 0, 0))
-        line3 = lines.addByTwoPoints(line2.endSketchPoint, line.startSketchPoint)
+            profile = sketch.profiles.item(0)
+            extent_distance = adsk.core.ValueInput.createByReal(ExtrusionLengthSelect)
+            extrudes = root_comp.features.extrudeFeatures
+            extrude1 = extrudes.addSimple(profile, extent_distance,
+                                          adsk.fusion.FeatureOperations.NewComponentFeatureOperation)
+        elif origin_select.selectedItem.name == 'Upper Right':
+            line = lines.addByTwoPoints(adsk.core.Point3D.create(0, 0, 0), adsk.core.Point3D.create(0, (-(fWidth)), 0))
+            line1 = lines.addByTwoPoints(line.endSketchPoint, adsk.core.Point3D.create((-(fHeight)), (-(fWidth)), 0))
+            line2 = lines.addByTwoPoints(line1.endSketchPoint, adsk.core.Point3D.create((-(fHeight)), 0, 0))
+            line3 = lines.addByTwoPoints(line2.endSketchPoint, line.startSketchPoint)
 
-        arc = sketch.sketchCurves.sketchArcs.addFillet(line, line.endSketchPoint.geometry, line1,
-                                                       line1.startSketchPoint.geometry, (wallThick * 2))
-        arc1 = sketch.sketchCurves.sketchArcs.addFillet(line1, line1.endSketchPoint.geometry, line2,
-                                                        line2.startSketchPoint.geometry, (wallThick * 2))
-        arc2 = sketch.sketchCurves.sketchArcs.addFillet(line2, line2.endSketchPoint.geometry, line3,
-                                                        line3.startSketchPoint.geometry, (wallThick * 2))
-        arc3 = sketch.sketchCurves.sketchArcs.addFillet(line3, line3.endSketchPoint.geometry, line,
-                                                        line.startSketchPoint.geometry, (wallThick * 2))
+            arc = sketch.sketchCurves.sketchArcs.addFillet(line, line.endSketchPoint.geometry, line1,
+                                                           line1.startSketchPoint.geometry, (wallThick * 2))
+            arc1 = sketch.sketchCurves.sketchArcs.addFillet(line1, line1.endSketchPoint.geometry, line2,
+                                                            line2.startSketchPoint.geometry, (wallThick * 2))
+            arc2 = sketch.sketchCurves.sketchArcs.addFillet(line2, line2.endSketchPoint.geometry, line3,
+                                                            line3.startSketchPoint.geometry, (wallThick * 2))
+            arc3 = sketch.sketchCurves.sketchArcs.addFillet(line3, line3.endSketchPoint.geometry, line,
+                                                            line.startSketchPoint.geometry, (wallThick * 2))
 
-        curves = sketch.findConnectedCurves(line)
+            curves = sketch.findConnectedCurves(line)
 
-        dirpoint = adsk.core.Point3D.create(0, 0, 0)
-        offsetCurves = sketch.offset(curves, dirpoint, (-(wallThick)))
+            dirpoint = adsk.core.Point3D.create(0, 0, 0)
+            offsetCurves = sketch.offset(curves, dirpoint, (-(wallThick)))
 
-        profile = sketch.profiles.item(1)
-        extent_distance = adsk.core.ValueInput.createByReal(ExtrusionLengthSelect)
-        extrudes = root_comp.features.extrudeFeatures
-        extrude1 = extrudes.addSimple(profile, extent_distance,
-                                      adsk.fusion.FeatureOperations.NewComponentFeatureOperation)
-    elif origin_select.selectedItem.name == 'Upper Left':
-        line = lines.addByTwoPoints(adsk.core.Point3D.create(0, 0, 0), adsk.core.Point3D.create(0, fWidth, 0))
-        line1 = lines.addByTwoPoints(line.endSketchPoint, adsk.core.Point3D.create((-(fHeight)), fWidth, 0))
-        line2 = lines.addByTwoPoints(line1.endSketchPoint, adsk.core.Point3D.create((-(fHeight)), 0, 0))
-        line3 = lines.addByTwoPoints(line2.endSketchPoint, line.startSketchPoint)
+            profile = sketch.profiles.item(1)
+            extent_distance = adsk.core.ValueInput.createByReal(ExtrusionLengthSelect)
+            extrudes = root_comp.features.extrudeFeatures
+            extrude1 = extrudes.addSimple(profile, extent_distance,
+                                          adsk.fusion.FeatureOperations.NewComponentFeatureOperation)
+        elif origin_select.selectedItem.name == 'Upper Left':
+            line = lines.addByTwoPoints(adsk.core.Point3D.create(0, 0, 0), adsk.core.Point3D.create(0, fWidth, 0))
+            line1 = lines.addByTwoPoints(line.endSketchPoint, adsk.core.Point3D.create((-(fHeight)), fWidth, 0))
+            line2 = lines.addByTwoPoints(line1.endSketchPoint, adsk.core.Point3D.create((-(fHeight)), 0, 0))
+            line3 = lines.addByTwoPoints(line2.endSketchPoint, line.startSketchPoint)
 
-        arc = sketch.sketchCurves.sketchArcs.addFillet(line, line.endSketchPoint.geometry, line1,
-                                                       line1.startSketchPoint.geometry, (wallThick * 2))
-        arc1 = sketch.sketchCurves.sketchArcs.addFillet(line1, line1.endSketchPoint.geometry, line2,
-                                                        line2.startSketchPoint.geometry, (wallThick * 2))
-        arc2 = sketch.sketchCurves.sketchArcs.addFillet(line2, line2.endSketchPoint.geometry, line3,
-                                                        line3.startSketchPoint.geometry, (wallThick * 2))
-        arc3 = sketch.sketchCurves.sketchArcs.addFillet(line3, line3.endSketchPoint.geometry, line,
-                                                        line.startSketchPoint.geometry, (wallThick * 2))
+            arc = sketch.sketchCurves.sketchArcs.addFillet(line, line.endSketchPoint.geometry, line1,
+                                                           line1.startSketchPoint.geometry, (wallThick * 2))
+            arc1 = sketch.sketchCurves.sketchArcs.addFillet(line1, line1.endSketchPoint.geometry, line2,
+                                                            line2.startSketchPoint.geometry, (wallThick * 2))
+            arc2 = sketch.sketchCurves.sketchArcs.addFillet(line2, line2.endSketchPoint.geometry, line3,
+                                                            line3.startSketchPoint.geometry, (wallThick * 2))
+            arc3 = sketch.sketchCurves.sketchArcs.addFillet(line3, line3.endSketchPoint.geometry, line,
+                                                            line.startSketchPoint.geometry, (wallThick * 2))
 
-        curves = sketch.findConnectedCurves(line)
+            curves = sketch.findConnectedCurves(line)
 
-        dirpoint = adsk.core.Point3D.create(0, 0, 0)
-        offsetCurves = sketch.offset(curves, dirpoint, (-(wallThick)))
+            dirpoint = adsk.core.Point3D.create(0, 0, 0)
+            offsetCurves = sketch.offset(curves, dirpoint, (-(wallThick)))
 
-        profile = sketch.profiles.item(0)
-        extent_distance = adsk.core.ValueInput.createByReal(ExtrusionLengthSelect)
-        extrudes = root_comp.features.extrudeFeatures
-        extrude1 = extrudes.addSimple(profile, extent_distance,
-                                      adsk.fusion.FeatureOperations.NewComponentFeatureOperation)
-    elif origin_select.selectedItem.name == 'Center':
-        line = lines.addByTwoPoints(adsk.core.Point3D.create((-fHeight/2), (-fWidth/2), 0),
-                                    adsk.core.Point3D.create((-fHeight/2), (fWidth/2), 0))
-        line1 = lines.addByTwoPoints(line.endSketchPoint, adsk.core.Point3D.create((fHeight/2), (fWidth/2), 0))
-        line2 = lines.addByTwoPoints(line1.endSketchPoint, adsk.core.Point3D.create(((fHeight/2)), -fWidth/2, 0))
-        line3 = lines.addByTwoPoints(line2.endSketchPoint, line.startSketchPoint)
+            profile = sketch.profiles.item(0)
+            extent_distance = adsk.core.ValueInput.createByReal(ExtrusionLengthSelect)
+            extrudes = root_comp.features.extrudeFeatures
+            extrude1 = extrudes.addSimple(profile, extent_distance,
+                                          adsk.fusion.FeatureOperations.NewComponentFeatureOperation)
+        elif origin_select.selectedItem.name == 'Center':
+            line = lines.addByTwoPoints(adsk.core.Point3D.create((-fHeight/2), (-fWidth/2), 0),
+                                        adsk.core.Point3D.create((-fHeight/2), (fWidth/2), 0))
+            line1 = lines.addByTwoPoints(line.endSketchPoint, adsk.core.Point3D.create((fHeight/2), (fWidth/2), 0))
+            line2 = lines.addByTwoPoints(line1.endSketchPoint, adsk.core.Point3D.create(((fHeight/2)), -fWidth/2, 0))
+            line3 = lines.addByTwoPoints(line2.endSketchPoint, line.startSketchPoint)
 
-        arc = sketch.sketchCurves.sketchArcs.addFillet(line, line.endSketchPoint.geometry, line1,
-                                                       line1.startSketchPoint.geometry, (wallThick * 2))
-        arc1 = sketch.sketchCurves.sketchArcs.addFillet(line1, line1.endSketchPoint.geometry, line2,
-                                                        line2.startSketchPoint.geometry, (wallThick * 2))
-        arc2 = sketch.sketchCurves.sketchArcs.addFillet(line2, line2.endSketchPoint.geometry, line3,
-                                                        line3.startSketchPoint.geometry, (wallThick * 2))
-        arc3 = sketch.sketchCurves.sketchArcs.addFillet(line3, line3.endSketchPoint.geometry, line,
-                                                        line.startSketchPoint.geometry, (wallThick * 2))
+            arc = sketch.sketchCurves.sketchArcs.addFillet(line, line.endSketchPoint.geometry, line1,
+                                                           line1.startSketchPoint.geometry, (wallThick * 2))
+            arc1 = sketch.sketchCurves.sketchArcs.addFillet(line1, line1.endSketchPoint.geometry, line2,
+                                                            line2.startSketchPoint.geometry, (wallThick * 2))
+            arc2 = sketch.sketchCurves.sketchArcs.addFillet(line2, line2.endSketchPoint.geometry, line3,
+                                                            line3.startSketchPoint.geometry, (wallThick * 2))
+            arc3 = sketch.sketchCurves.sketchArcs.addFillet(line3, line3.endSketchPoint.geometry, line,
+                                                            line.startSketchPoint.geometry, (wallThick * 2))
 
-        curves = sketch.findConnectedCurves(line)
+            curves = sketch.findConnectedCurves(line)
 
-        dirpoint = adsk.core.Point3D.create(0, 0, 0)
-        offsetCurves = sketch.offset(curves, dirpoint, (-(wallThick)))
+            dirpoint = adsk.core.Point3D.create(0, 0, 0)
+            offsetCurves = sketch.offset(curves, dirpoint, (-(wallThick)))
 
-        profile = sketch.profiles.item(0)
-        extent_distance = adsk.core.ValueInput.createByReal(ExtrusionLengthSelect)
-        extrudes = root_comp.features.extrudeFeatures
-        extrude1 = extrudes.addSimple(profile, extent_distance,
-                                      adsk.fusion.FeatureOperations.NewComponentFeatureOperation)
-
+            profile = sketch.profiles.item(0)
+            extent_distance = adsk.core.ValueInput.createByReal(ExtrusionLengthSelect)
+            extrudes = root_comp.features.extrudeFeatures
+            extrude1 = extrudes.addSimple(profile, extent_distance,
+                                          adsk.fusion.FeatureOperations.NewComponentFeatureOperation)
+    elif fam_select.selectedItem.name == 'pipe':
+        #this is the construction of the pipe extrusion
+        if origin_select.selectedItem.name == 'Lower Left':
+            c1 = circle.addByCenterRadius(adsk.core.Point3D.create(0, 0, 0), 2)
 
 def addRowToTable(tab1):
     global _rowNumber
@@ -233,11 +241,13 @@ class FrameGenerator(Fusion360CommandBase):
     # Commands in here will be run through the Fusion processor and changes will be reflected in  Fusion graphics area
     def on_preview(self, command: adsk.core.Command, inputs: adsk.core.CommandInputs, changed_input,
                    input_values):
+        ao = AppObjects()
         rows = tab1.rowCount
         table_input = inputs.itemById('MemberTable')
         row_select = table_input.selectedRow
         mem_select = inputs.itemById('MST' + str(row_select))
-        size_select = inputs.itemById('SizeSelect' + str(row_select))
+        size_select = inputs.itemById('Size' + str(row_select))
+
         geom_select = input_values['FSketchSel']
         i = 0
         while i < rows:
@@ -258,6 +268,7 @@ class FrameGenerator(Fusion360CommandBase):
         # select = eventArgs.inputs
         # cmdInput = eventArgs.input
         global count, _rowNumber, table_input, loc
+        ao = AppObjects()
         geom_select = inputs.itemById('FSketchSel')
         if changed_input == inputs.itemById('FSketchSel'):
             IC = geom_select.selectionCount
@@ -276,8 +287,8 @@ class FrameGenerator(Fusion360CommandBase):
         fam_select = inputs.itemById('Family')
         size_select = inputs.itemById('Size')
 
-        if changed_input == fam_select:
 
+        if changed_input == fam_select:
             # sheet.cell_value(0, 0)
             if changed_input.selectedItem.name == 'Square':
                 size_select.listItems.clear()
@@ -304,12 +315,13 @@ class FrameGenerator(Fusion360CommandBase):
     # This is typically where your main program logic would go
     def on_execute(self, command: adsk.core.Command, inputs: adsk.core.CommandInputs, args, input_values):
         global tab1, _rowNumber, count
+        ao= AppObjects()
         rows = tab1.rowCount
         table_input = inputs.itemById('MemberTable')
-        row_select = table_input.selectedRow
-        mem_select = inputs.itemById('MST' + str(row_select))
-        size_select = inputs.itemById('SizeSelect' + str(row_select))
-        geom_select = input_values['FSketchSel']
+        # row_select = table_input.selectedRow
+        # mem_select = inputs.itemById('MST' + str(row_select))
+        # size_select = inputs.itemById('SizeSelect' + str(row_select))
+        # geom_select = input_values['FSketchSel']
         i = 0
         while i < rows:
             table_input.selectedRow = i
@@ -318,7 +330,7 @@ class FrameGenerator(Fusion360CommandBase):
 
         _rowNumber = 0
         count = 0
-        
+
     # Run when the user selects your command icon from the Fusion 360 UI
     # Typically used to create and display a command dialog box
     # The following is a basic sample of a dialog UI
@@ -327,8 +339,8 @@ class FrameGenerator(Fusion360CommandBase):
         global geo_select, tab1, trimmed_dist, rotation
 
         # Create a default value using a string
-        default_value = adsk.core.ValueInput.createByString('1.0 in')
-        ao = get_app_objects()
+        # default_value = adsk.core.ValueInput.createByString('1.0 in')
+        # ao = get_app_objects()
 
         # selection input for Frame skeleton
         geo_select = inputs.addSelectionInput('FSketchSel', 'Select Geometry', 'Basic select command input')
@@ -352,7 +364,7 @@ class FrameGenerator(Fusion360CommandBase):
         for i in range(sqsheet.nrows):
             sizeString = str(sqsheet.cell_value(i, 0)) + "x" + str(sqsheet.cell_value(i, 1)) + "x" + \
                          str(sqsheet.cell_value(i, 2))
-            size_select.listItems.add(sizeString, False)
+            size_select.listItems.add(sizeString, True)
 
         # material_select = inputs.addDropDownCommandInput('Material', 'Select Material',
         #                                                  adsk.core.DropDownStyles.TextListDropDownStyle)
@@ -365,16 +377,7 @@ class FrameGenerator(Fusion360CommandBase):
 
         # table input for Selections
         tab1 = inputs.addTableCommandInput('MemberTable', 'Selected Lines', 4, '.75:2:1:1:1')
-        # tab1.maximumVisibleRows = 8
-        # addRowToTable(tab1)
-
-        # Add inputs into the table.
-        # addButtonInput = tab1.addBoolValueInput('tableAdd', 'Add', False, '', True)
-        # tab1.addToolbarCommandInput(addButtonInput)
-        # deleteButtonInput = tab1.addBoolValueInput('tableDelete', 'Delete', False, '', True)
-        # tab1.addToolbarCommandInput(deleteButtonInput)
-        # trimmed_dist = inputs.addValueInput('Trimmed', 'Trimmed Distance', 'in',
-        #                                     adsk.core.ValueInput.createByString('2 in'))
+        
         inputs.addTextBoxCommandInput('spacer_1', '', '<hr>', 1, True)
         inputs.addTextBoxCommandInput('lT10', '', 'This Section is for Orientation of the Member Row Selected', 1, True)
 
